@@ -81,7 +81,7 @@ if meta_file and shopify_file:
         corr_df = corr_df.sort_values(by="Impact Score (1-10)", ascending=False)
 
     # Top 10 ads by Orders
-    top_ads = agg_df.sort_values(by="Orders", ascending=False).head(10)
+    top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
 
     # ---------------------------
     # Display Results
