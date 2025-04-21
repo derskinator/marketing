@@ -80,17 +80,12 @@ if meta_file and shopify_file:
         corr_df["Impact Score (1-10)"] = scaler.fit_transform(corr_df[["Correlation with Orders"]])
         corr_df = corr_df.sort_values(by="Impact Score (1-10)", ascending=False)
 
-    # Top 10 ads by Orders
-    top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
+# Top 50 ads by Orders
+top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
+top_ads["ROAS"] = top_ads["Shopify Revenue"] / top_ads["Amount spent (USD)"]
 
-    # ---------------------------
-    # Display Results
-    # ---------------------------
-    st.subheader("🔥 Engagement Metric Impact Scores (Across All Ads)")
-    st.dataframe(corr_df, use_container_width=True)
-
-    st.subheader("🏆 Top 10 Ads by Orders")
-    st.dataframe(top_ads, use_container_width=True)
+st.subheader("🏆 Top 50 Ads by Orders")
+st.dataframe(top_ads, use_container_width=True)
 
 else:
     st.info("👆 Upload both files to get started.")
