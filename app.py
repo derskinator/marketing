@@ -66,6 +66,9 @@ if meta_file and shopify_file:
         "Amount spent (USD)": "sum"
     }).reset_index()
 
+    # Add ROAS
+    agg_df["ROAS"] = agg_df["Shopify Revenue"] / agg_df["Amount spent (USD)"]
+
     # Correlation analysis
     corr_data = []
     for col in metrics:
@@ -74,18 +77,20 @@ if meta_file and shopify_file:
             corr_data.append({"Engagement Metric": col, "Correlation with Orders": corr})
 
     # Create and scale Impact Score
-    corr_df = pd.DataFrame(corr_data)
-    if not corr_df.empty:
+    if corr_data:
+        corr_df = pd.DataFrame(corr_data)
         scaler = MinMaxScaler(feature_range=(1, 10))
         corr_df["Impact Score (1-10)"] = scaler.fit_transform(corr_df[["Correlation with Orders"]])
         corr_df = corr_df.sort_values(by="Impact Score (1-10)", ascending=False)
 
-# Top 50 ads by Orders
-top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
-top_ads["ROAS"] = top_ads["Shopify Revenue"] / top_ads["Amount spent (USD)"]
+        st.subheader("🔥 Engagement Metric Impact Scores (Across All Ads)")
+        st.dataframe(corr_df, use_container_width=True)
 
-st.subheader("🏆 Top 50 Ads by Orders")
-st.dataframe(top_ads, use_container_width=True)
+    # Top 50 ads by Orders
+    top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
+
+    st.subheader("🏆 Top 50 Ads by Orders (with ROAS)")
+    st.dataframe(top_ads, use_container_width=True)
 
 else:
     st.info("👆 Upload both files to get started.")
