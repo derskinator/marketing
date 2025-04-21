@@ -1,0 +1,82 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+st.set_page_config(layout="wide", page_title="Per-Ad Engagement Impact Analyzer")
+
+st.title("📊 Per-Ad Engagement Impact Analyzer (Scaled 1–10)")
+st.markdown("Upload Meta and Shopify datasets. For each ad, view ROAS and engagement metrics ranked by their correlation with sales.")
+
+# Upload Files
+meta_file = st.file_uploader("📤 Upload Meta Ads CSV", type=["csv"])
+shopify_file = st.file_uploader("📤 Upload Shopify Sales Excel", type=["xlsx"])
+
+if meta_file and shopify_file:
+    # Load data
+    meta_df = pd.read_csv(meta_file)
+    shopify_df = pd.read_excel(shopify_file)
+
+    # Merge on Ad name
+    shopify_df = shopify_df.rename(columns={
+        "Order UTM campaign": "Ad name",
+        "Total sales": "Shopify Revenue"
+    })
+
+    df = pd.merge(shopify_df, meta_df, on="Ad name", how="inner")
+    df["ROAS"] = df["Shopify Revenue"] / df["Amount spent (USD)"]
+
+    # List unique ads
+    ad_names = df["Ad name"].dropna().unique()
+    selected_ad = st.selectbox("🎯 Select an Ad to Analyze", ad_names)
+
+    ad_data = df[df["Ad name"] == selected_ad]
+
+    if not ad_data.empty:
+        st.subheader(f"📌 Performance Overview for '{selected_ad}'")
+
+        st.metric("Revenue", f"${ad_data['Shopify Revenue'].sum():,.2f}")
+        st.metric("Ad Spend", f"${ad_data['Amount spent (USD)'].sum():,.2f}")
+        st.metric("ROAS", f"{ad_data['ROAS'].mean():.2f}")
+
+        # Engagement Metrics to analyze (exclude clicks & impressions)
+        engagement_cols = [
+            'Frequency',
+            'CPC (cost per link click) (USD)',
+            'CTR (link click-through rate)',
+            'Video average play time',
+            '% of Plays at 25%',
+            'Video plays at 50%',
+            'Video plays at 100%',
+            'ThruPlays'
+        ]
+
+        # Ensure numeric and available
+        metrics = [col for col in engagement_cols if col in ad_data.columns and pd.api.types.is_numeric_dtype(ad_data[col])]
+        analysis_df = ad_data[["Shopify Revenue"] + metrics].dropna()
+
+        if len(analysis_df) > 1:
+            # Correlation calculation
+            raw_corrs = analysis_df.corr().loc[metrics, "Shopify Revenue"]
+
+            # Scale correlations to 1–10
+            abs_corrs = raw_corrs.abs()
+            scaled_scores = 1 + 9 * ((abs_corrs - abs_corrs.min()) / (abs_corrs.max() - abs_corrs.min()))
+            impact_df = pd.DataFrame({
+                "Engagement Metric": raw_corrs.index,
+                "Raw Correlation": raw_corrs.values,
+                "Impact Score (1-10)": scaled_scores.round(1)
+            }).sort_values(by="Impact Score (1-10)", ascending=False)
+
+            st.subheader("📈 Engagement Metric Impact Scores")
+            st.dataframe(impact_df)
+
+            # Plot top correlated metric
+            top_metric = impact_df.iloc[0]["Engagement Metric"]
+            st.subheader(f"🔍 Visualization: {top_metric} vs Revenue")
+            sns.scatterplot(data=ad_data, x=top_metric, y="Shopify Revenue")
+            plt.title(f"{top_metric} vs Shopify Revenue")
+            st.pyplot(plt)
+        else:
+            st.warning("Not enough data for correlation analysis.")
