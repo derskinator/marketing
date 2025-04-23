@@ -143,9 +143,10 @@ if meta_file and shopify_file:
         st.dataframe(corr_df, use_container_width=True)
 
     # Show top ads
-    top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
-    st.subheader("🏆 Top 50 Ads by Orders (with ROAS)")
+    top_ads = agg_df.sort_values(by="Orders", ascending=False).head(100)
+    st.subheader(f"🏆 Top {len(top_ads)} Ads by Orders (with ROAS)")
     st.dataframe(top_ads, use_container_width=True)
 
 else:
     st.info("👆 Upload both files to get started.")
+
