@@ -90,16 +90,19 @@ if meta_file and shopify_file:
         if col in meta_df.columns:
             meta_df[col] = pd.to_numeric(meta_df[col], errors='coerce').fillna(0)
 
-    # Load Shopify data
-    shopify_df = pd.read_excel(shopify_file)
-    shopify_df = shopify_df.rename(columns={
-        "Order UTM campaign": "Ad name",
-        "Total sales": "Shopify Revenue"
-    })
-    shopify_df["Orders"] = pd.to_numeric(shopify_df["Orders"], errors='coerce').fillna(0)
+# Load Shopify data
+shopify_df = pd.read_excel(shopify_file)
 
-    # Show UTM analysis
-    st.markdown(generate_utm_analysis_paragraph(shopify_df))
+# Show UTM analysis BEFORE renaming
+st.markdown(generate_utm_analysis_paragraph(shopify_df))
+
+# Now rename and prep for merging
+shopify_df = shopify_df.rename(columns={
+    "Order UTM campaign": "Ad name",
+    "Total sales": "Shopify Revenue"
+})
+shopify_df["Orders"] = pd.to_numeric(shopify_df["Orders"], errors='coerce').fillna(0)
+
 
     # Merge datasets
     df = pd.merge(shopify_df, meta_df, on="Ad name", how="inner")
