@@ -104,5 +104,6 @@ if meta_file and shopify_file:
     shopify_df["Orders"] = pd.to_numeric(shopify_df["Orders"], errors='coerce').fillna(0)
 
     # Merge datasets
-    df = pd.merge(shopify_df, meta_df, on="Ad name
+    df = pd.merge(shopify_df, meta_df, on="Ad name", how="inner")
+
 
