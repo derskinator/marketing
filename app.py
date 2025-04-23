@@ -90,55 +90,19 @@ if meta_file and shopify_file:
         if col in meta_df.columns:
             meta_df[col] = pd.to_numeric(meta_df[col], errors='coerce').fillna(0)
 
-# Load Shopify data
-shopify_df = pd.read_excel(shopify_file)
+    # Load Shopify data
+    shopify_df = pd.read_excel(shopify_file)
 
-# Show UTM analysis BEFORE renaming
-st.markdown(generate_utm_analysis_paragraph(shopify_df))
+    # Run UTM analysis before renaming columns
+    st.markdown(generate_utm_analysis_paragraph(shopify_df))
 
-# Now rename and prep for merging
-shopify_df = shopify_df.rename(columns={
-    "Order UTM campaign": "Ad name",
-    "Total sales": "Shopify Revenue"
-})
-shopify_df["Orders"] = pd.to_numeric(shopify_df["Orders"], errors='coerce').fillna(0)
-
+    # Now rename and prep for merging
+    shopify_df = shopify_df.rename(columns={
+        "Order UTM campaign": "Ad name",
+        "Total sales": "Shopify Revenue"
+    })
+    shopify_df["Orders"] = pd.to_numeric(shopify_df["Orders"], errors='coerce').fillna(0)
 
     # Merge datasets
-    df = pd.merge(shopify_df, meta_df, on="Ad name", how="inner")
-
-    # Aggregate per ad
-    agg_df = df.groupby("Ad name").agg({
-        **{col: 'mean' for col in metrics},
-        "Orders": "sum",
-        "Shopify Revenue": "sum",
-        "Amount spent (USD)": "sum"
-    }).reset_index()
-
-    # Add ROAS
-    agg_df["ROAS"] = agg_df["Shopify Revenue"] / agg_df["Amount spent (USD)"]
-
-    # Impact score via correlation
-    corr_data = []
-    for col in metrics:
-        if agg_df[col].nunique() > 1:
-            corr = agg_df[col].corr(agg_df["Orders"])
-            corr_data.append({"Engagement Metric": col, "Correlation with Orders": corr})
-
-    if corr_data:
-        corr_df = pd.DataFrame(corr_data)
-        scaler = MinMaxScaler(feature_range=(1, 10))
-        corr_df["Impact Score (1-10)"] = scaler.fit_transform(corr_df[["Correlation with Orders"]])
-        corr_df = corr_df.sort_values(by="Impact Score (1-10)", ascending=False)
-
-        st.subheader("🔥 Engagement Metric Impact Scores (Across All Ads)")
-        st.dataframe(corr_df, use_container_width=True)
-
-    # Top 50 ads with ROAS
-    top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
-    st.subheader("🏆 Top 50 Ads by Orders (with ROAS)")
-    st.dataframe(top_ads, use_container_width=True)
-
-else:
-    st.info("👆 Upload both files to get started.")
+    df = pd.merge(shopify_df, meta_df, on="Ad name
 
