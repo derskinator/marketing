@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import re
+import itertools
+from collections import Counter
 from sklearn.preprocessing import MinMaxScaler
 
 st.set_page_config(layout="wide", page_title="Ad Engagement Dashboard")
@@ -9,9 +11,51 @@ st.set_page_config(layout="wide", page_title="Ad Engagement Dashboard")
 st.title("📊 Ad Engagement Impact Dashboard")
 st.markdown("Upload your Meta Ads CSV and Shopify Sales Excel files to analyze engagement effectiveness by ad.")
 
-# ---------------------------
-# File Upload
-# ---------------------------
+# --- UTM Campaign Analysis ---
+def generate_utm_analysis_paragraph(shopify_df):
+    if "Order UTM campaign" not in shopify_df.columns or "Orders" not in shopify_df.columns:
+        return "UTM analysis not available — missing required fields."
+
+    utm_series = shopify_df["Order UTM campaign"].dropna().astype(str)
+
+    # Tokenize UTM strings
+    token_lists = utm_series.str.replace("_", " ").str.lower().str.split()
+    tokens_flat = list(itertools.chain.from_iterable(token_lists))
+
+    # Count token frequency overall
+    token_counts = Counter(tokens_flat)
+
+    # Get top-performing UTM campaigns by orders
+    utm_sales_df = shopify_df.groupby("Order UTM campaign").agg({
+        "Orders": "sum",
+        "Shopify Revenue": "sum" if "Shopify Revenue" in shopify_df.columns else "Total sales"
+    }).reset_index()
+
+    top_utms = utm_sales_df.sort_values(by="Orders", ascending=False).head(20)["Order UTM campaign"]
+    top_tokens = list(itertools.chain.from_iterable(
+        top_utms.dropna().astype(str).str.replace("_", " ").str.lower().str.split()
+    ))
+
+    # Count top token frequency
+    top_token_counts = Counter(top_tokens)
+    common_tokens = [word for word, count in top_token_counts.items() if count > 1 and word.isalpha()]
+
+    # Generate analysis paragraph
+    if common_tokens:
+        examples = ", ".join(common_tokens[:4]) + ("..." if len(common_tokens) > 4 else "")
+        return (
+            f"🧠 **UTM Campaign Analysis:** Based on UTM parameters, we found that ads containing the keywords "
+            f"**{examples}** were most strongly associated with high-performing campaigns in terms of sales. "
+            f"These terms consistently appeared in the top UTM campaigns and may reflect strong audience targeting, "
+            f"effective offers, or creative hooks worth exploring further."
+        )
+    else:
+        return (
+            "🧠 **UTM Campaign Analysis:** No strong recurring keywords were detected among the top-performing UTM campaigns. "
+            "Consider using more consistent and descriptive UTM naming to better understand what drives success."
+        )
+
+# --- File Upload ---
 meta_file = st.file_uploader("Upload Meta Ads CSV", type=["csv"])
 shopify_file = st.file_uploader("Upload Shopify Sales Excel", type=["xlsx"])
 
@@ -19,7 +63,7 @@ if meta_file and shopify_file:
     # Load Meta Ads data
     meta_df = pd.read_csv(meta_file, encoding='utf-8', engine='python', on_bad_lines='skip')
 
-    # Fix video time format
+    # Convert time format
     def convert_time_to_seconds(val):
         if isinstance(val, str):
             match = re.match(r"(\d+):(\d+):(\d+)", val)
@@ -30,7 +74,7 @@ if meta_file and shopify_file:
 
     meta_df['Video average play time (s)'] = meta_df['Video average play time'].apply(convert_time_to_seconds)
 
-    # Engagement metrics to evaluate
+    # Define engagement metrics
     metrics = [
         'Frequency',
         'CPC (cost per link click) (USD)',
@@ -42,12 +86,11 @@ if meta_file and shopify_file:
         'ThruPlays'
     ]
 
-    # Coerce to numeric and fill NaNs
     for col in metrics:
         if col in meta_df.columns:
             meta_df[col] = pd.to_numeric(meta_df[col], errors='coerce').fillna(0)
 
-    # Load Shopify sales data
+    # Load Shopify data
     shopify_df = pd.read_excel(shopify_file)
     shopify_df = shopify_df.rename(columns={
         "Order UTM campaign": "Ad name",
@@ -55,7 +98,10 @@ if meta_file and shopify_file:
     })
     shopify_df["Orders"] = pd.to_numeric(shopify_df["Orders"], errors='coerce').fillna(0)
 
-    # Merge on Ad name
+    # Show UTM analysis
+    st.markdown(generate_utm_analysis_paragraph(shopify_df))
+
+    # Merge datasets
     df = pd.merge(shopify_df, meta_df, on="Ad name", how="inner")
 
     # Aggregate per ad
@@ -69,14 +115,13 @@ if meta_file and shopify_file:
     # Add ROAS
     agg_df["ROAS"] = agg_df["Shopify Revenue"] / agg_df["Amount spent (USD)"]
 
-    # Correlation analysis
+    # Impact score via correlation
     corr_data = []
     for col in metrics:
         if agg_df[col].nunique() > 1:
             corr = agg_df[col].corr(agg_df["Orders"])
             corr_data.append({"Engagement Metric": col, "Correlation with Orders": corr})
 
-    # Create and scale Impact Score
     if corr_data:
         corr_df = pd.DataFrame(corr_data)
         scaler = MinMaxScaler(feature_range=(1, 10))
@@ -86,11 +131,11 @@ if meta_file and shopify_file:
         st.subheader("🔥 Engagement Metric Impact Scores (Across All Ads)")
         st.dataframe(corr_df, use_container_width=True)
 
-    # Top 50 ads by Orders
+    # Top 50 ads with ROAS
     top_ads = agg_df.sort_values(by="Orders", ascending=False).head(50)
-
     st.subheader("🏆 Top 50 Ads by Orders (with ROAS)")
     st.dataframe(top_ads, use_container_width=True)
 
 else:
     st.info("👆 Upload both files to get started.")
+
