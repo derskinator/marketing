@@ -85,13 +85,22 @@ if meta_file and shopify_file:
         'ThruPlays'
     ]
 
-    # Convert engagement columns to numeric
     for col in metrics:
         if col in meta_df.columns:
             meta_df[col] = pd.to_numeric(meta_df[col], errors='coerce').fillna(0)
 
     # Load Shopify data
     shopify_df = pd.read_excel(shopify_file)
+
+    # --- UTM Keyword Exclusion Filter ---
+    exclusion_input = st.text_input("🔍 Exclude UTM Keywords (comma-separated)", "")
+    if exclusion_input:
+        exclude_keywords = [word.strip().lower() for word in exclusion_input.split(",") if word.strip()]
+        if "Order UTM campaign" in shopify_df.columns:
+            mask = shopify_df["Order UTM campaign"].astype(str).str.lower()
+            for kw in exclude_keywords:
+                mask = mask[~mask.str.contains(kw)]
+            shopify_df = shopify_df.loc[mask.index]
 
     # Show UTM analysis BEFORE renaming
     st.markdown(generate_utm_analysis_paragraph(shopify_df))
@@ -140,4 +149,3 @@ if meta_file and shopify_file:
 
 else:
     st.info("👆 Upload both files to get started.")
-
